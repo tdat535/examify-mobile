@@ -1,0 +1,26 @@
+name: examify_app
+description: Modern teacher UI for Examify (Demo).
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=2.18.0 <4.0.0"
+
+dependencies:
+  google_sign_in: ^6.3.0
+  google_fonts: ^6.3.2
+  flutter_facebook_auth: ^7.1.2
+  http: ^1.5.0
+  shared_preferences: ^2.5.3
+  jwt_decoder: ^2.0.1
+  advanced_salomon_bottom_bar: ^3.3.4
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/
