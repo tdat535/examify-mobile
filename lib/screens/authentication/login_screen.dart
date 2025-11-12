@@ -5,8 +5,8 @@ import '../../utils/handleFacebookLogin.dart';
 import '../../utils/handleGoogleLogin.dart';
 import '../../utils/token_storage.dart';
 import '../teacher/dashboard_screen.dart';
-import 'register_screen.dart';
 import '../student/student_screen.dart';
+import 'register_screen.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -22,6 +22,8 @@ class _LoginScreenState extends State<LoginScreen> {
   final _pass = TextEditingController();
   bool _obscurePassword = true;
   bool _isLoading = false;
+
+  // Chỉ cần sửa hàm _handleLogin trong file login_screen.dart
 
   Future<void> _handleLogin() async {
     if (_username.text.isEmpty || _pass.text.isEmpty) {
@@ -40,11 +42,22 @@ class _LoginScreenState extends State<LoginScreen> {
 
         final decoded = JwtDecoder.decode(accessToken);
         final role = decoded['role'];
+        final userId =
+            decoded['id'] ?? decoded['userId'] ?? 0; // Lấy userId từ token
 
         if (role == 2) {
+          // Teacher
           Navigator.pushReplacementNamed(context, DashboardScreen.routeName);
         } else if (role == 3) {
-          Navigator.pushReplacementNamed(context, StudentScreen.routeName);
+          // Student - Truyền token và studentId
+          Navigator.pushReplacementNamed(
+            context,
+            StudentScreen.routeName,
+            arguments: {
+              'token': accessToken,
+              'studentId': userId,
+            },
+          );
         } else {
           _showError('Không xác định được vai trò người dùng.');
         }

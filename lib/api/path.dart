@@ -31,10 +31,15 @@ class ApiPath {
   static String examDetailForTeacher(String examId) =>
       '$baseUrl/exam/examDetailForTeacher/$examId';
   static String examDetailForStudent(String examId) =>
-      '$baseUrl/exam/examDetailForTeacher/$examId';
+      '$baseUrl/exam/examDetailForStudent/$examId';
   static String addQuestion(String examId) =>
       '$baseUrl/exam/add-question/$examId';
 
   // ===== NOTIFICATION =====
   static const String getNotifications = '$baseUrl/notifications';
+
+  // ===== STUDENT =====
+  static const String studentJoinClass = '$baseUrl/student/join';
+  static const String studentGetClasses = '$baseUrl/student/getClasses';
+  static const String examResults = '$baseUrl/exam/exam-results';
 }
