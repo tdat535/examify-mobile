@@ -34,6 +34,8 @@ class ApiPath {
       '$baseUrl/exam/examDetailForStudent/$examId';
   static String addQuestion(String examId) =>
       '$baseUrl/exam/add-question/$examId';
+  static String submitExam(String examId) =>
+      '$baseUrl/exam/submit-exam/$examId';
 
   // ===== NOTIFICATION =====
   static const String getNotifications = '$baseUrl/notifications';

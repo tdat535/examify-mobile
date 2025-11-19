@@ -49,6 +49,27 @@ class StudentAPI {
     }
   }
 
+  /// Lấy danh sách bài thi trong lớp
+  static Future<List<dynamic>> getExamsByClass({
+    required String token,
+    required String classId,
+  }) async {
+    final res = await http.get(
+      Uri.parse(ApiPath.getExamsInclas(classId)),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+    );
+
+    if (res.statusCode == 200) {
+      final decoded = json.decode(res.body);
+      return decoded['data'] ?? [];
+    } else {
+      throw Exception('Failed to load exams: ${res.body}');
+    }
+  }
+
   /// Lấy chi tiết đề thi cho học sinh (không có đáp án đúng)
   static Future<Map<String, dynamic>> getExamDetailForStudent({
     required String token,
@@ -67,6 +88,33 @@ class StudentAPI {
       return decoded['data'];
     } else {
       throw Exception('Failed to load exam detail: ${res.body}');
+    }
+  }
+
+  /// Nộp bài thi của học sinh
+  static Future<Map<String, dynamic>> submitExam({
+    required String token,
+    required String examId,
+    required List<Map<String, int>> answers,
+  }) async {
+    final body = {
+      "answers": answers,
+    };
+
+    final res = await http.post(
+      Uri.parse(ApiPath.submitExam(examId)),
+      headers: {
+        'Authorization': 'Bearer $token',
+        'Content-Type': 'application/json',
+      },
+      body: json.encode(body),
+    );
+
+    if (res.statusCode == 200) {
+      final decoded = json.decode(res.body);
+      return decoded;
+    } else {
+      throw Exception('Failed to submit exam: ${res.body}');
     }
   }
 

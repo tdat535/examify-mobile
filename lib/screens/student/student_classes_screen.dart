@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../api/student.dart';
 import 'join_class_dialog.dart';
+import 'exam_detail_screen.dart';
 
 class StudentClassesScreen extends StatefulWidget {
   final String token;
@@ -236,10 +237,12 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
   Future<void> _loadExams() async {
     setState(() => _isLoading = true);
     try {
-      // TODO: Gọi API lấy danh sách bài thi trong lớp
-      // Tạm thời để empty
+      final exams = await StudentAPI.getExamsByClass(
+        token: widget.token,
+        classId: widget.classId,
+      );
       setState(() {
-        _exams = [];
+        _exams = exams;
         _isLoading = false;
       });
     } catch (e) {
@@ -291,7 +294,22 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                         subtitle: Text('Thời gian: ${exam['duration']} phút'),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () {
-                          // TODO: Navigate to exam screen
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ExamDetailScreen(
+                                token: widget.token,
+                                examId: exam['id'].toString(),
+                                examTitle: exam['title'],
+                                duration: exam['duration'],
+                              ),
+                            ),
+                          ).then((submitted) {
+                            if (submitted == true) {
+                              // Refresh danh sách bài thi sau khi nộp bài
+                              _loadExams();
+                            }
+                          });
                         },
                       ),
                     );
