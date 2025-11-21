@@ -70,6 +70,62 @@ class StudentAPI {
     }
   }
 
+  /// Lấy 5 bài thi mới nhất từ tất cả các lớp
+  static Future<List<Map<String, dynamic>>> getRecentExams({
+    required String token,
+    int limit = 5,
+  }) async {
+    try {
+      // Bước 1: Lấy danh sách tất cả các lớp
+      final classes = await getClasses(token);
+
+      if (classes.isEmpty) {
+        return [];
+      }
+
+      // Bước 2: Lấy bài thi từ tất cả các lớp
+      List<Map<String, dynamic>> allExams = [];
+
+      for (var classData in classes) {
+        try {
+          final exams = await getExamsByClass(
+            token: token,
+            classId: classData['id'].toString(),
+          );
+
+          // Thêm thông tin lớp vào mỗi bài thi
+          for (var exam in exams) {
+            allExams.add({
+              ...exam,
+              'className': classData['className'],
+              'classCode': classData['classCode'],
+              'classId': classData['id'],
+            });
+          }
+        } catch (e) {
+          // Bỏ qua lỗi của từng lớp, tiếp tục với lớp khác
+          print('Error loading exams for class ${classData['id']}: $e');
+        }
+      }
+
+      // Bước 3: Sắp xếp theo thời gian tạo (mới nhất trước)
+      allExams.sort((a, b) {
+        try {
+          final dateA = DateTime.parse(a['createdAt']);
+          final dateB = DateTime.parse(b['createdAt']);
+          return dateB.compareTo(dateA); // Giảm dần (mới nhất trước)
+        } catch (e) {
+          return 0;
+        }
+      });
+
+      // Bước 4: Lấy N bài mới nhất
+      return allExams.take(limit).toList();
+    } catch (e) {
+      throw Exception('Failed to load recent exams: $e');
+    }
+  }
+
   /// Lấy chi tiết đề thi cho học sinh (không có đáp án đúng)
   static Future<Map<String, dynamic>> getExamDetailForStudent({
     required String token,

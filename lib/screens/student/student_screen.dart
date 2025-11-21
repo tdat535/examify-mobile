@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'student_home_screen.dart';
 import 'student_classes_screen.dart';
-import 'student_results_screen.dart';
 import 'student_profile_screen.dart';
 
 class StudentScreen extends StatefulWidget {
@@ -20,6 +19,7 @@ class _StudentScreenState extends State<StudentScreen> {
   int? _studentId;
 
   late final List<Widget> _screens;
+  bool _isInitialized = false; // Thêm flag để tránh khởi tạo lại
 
   @override
   void initState() {
@@ -30,28 +30,41 @@ class _StudentScreenState extends State<StudentScreen> {
   void didChangeDependencies() {
     super.didChangeDependencies();
 
-    // Lấy arguments từ route
-    final args =
-        ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
-    _token = args?['token'];
-    _studentId = args?['studentId'];
+    // Chỉ khởi tạo một lần duy nhất
+    if (!_isInitialized) {
+      // Lấy arguments từ route
+      final args =
+          ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+      _token = args?['token'];
+      _studentId = args?['studentId'];
 
-    // TODO: Nếu không có args, lấy từ TokenStorage
-    // if (_token == null) {
-    //   _token = await TokenStorage.getToken();
-    //   _studentId = await TokenStorage.getStudentId();
-    // }
+      // TODO: Nếu không có args, lấy từ TokenStorage
+      // if (_token == null) {
+      //   _token = await TokenStorage.getToken();
+      //   _studentId = await TokenStorage.getStudentId();
+      // }
 
-    _screens = [
-      StudentHomeScreen(token: _token ?? '', studentId: _studentId ?? 0),
-      StudentClassesScreen(token: _token ?? '', studentId: _studentId ?? 0),
-      StudentResultsScreen(token: _token ?? ''),
-      StudentProfileScreen(token: _token ?? ''),
-    ];
+      _screens = [
+        StudentHomeScreen(token: _token ?? '', studentId: _studentId ?? 0),
+        StudentClassesScreen(token: _token ?? '', studentId: _studentId ?? 0),
+        StudentProfileScreen(token: _token ?? ''),
+      ];
+
+      _isInitialized = true;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    // Thêm kiểm tra để đảm bảo đã khởi tạo
+    if (!_isInitialized) {
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
     return Scaffold(
       body: IndexedStack(
         index: _currentIndex,
@@ -78,11 +91,6 @@ class _StudentScreenState extends State<StudentScreen> {
             icon: Icon(Icons.class_outlined),
             activeIcon: Icon(Icons.class_),
             label: 'Lớp học',
-          ),
-          BottomNavigationBarItem(
-            icon: Icon(Icons.assessment_outlined),
-            activeIcon: Icon(Icons.assessment),
-            label: 'Kết quả',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.person_outline),

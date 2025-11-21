@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../api/student.dart';
 import 'join_class_dialog.dart';
+import 'exam_results_screen.dart';
+import 'student_classes_screen.dart';
 import 'exam_detail_screen.dart';
 
 class StudentHomeScreen extends StatefulWidget {
@@ -19,8 +21,10 @@ class StudentHomeScreen extends StatefulWidget {
 
 class _StudentHomeScreenState extends State<StudentHomeScreen> {
   bool _isLoading = true;
-  List<dynamic> _recentExams = [];
+  List<Map<String, dynamic>> _recentExams = []; // Đổi type
   List<dynamic> _myClasses = [];
+  List<dynamic> _allResults = [];
+  double _averageScore = 0;
 
   @override
   void initState() {
@@ -31,19 +35,38 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
   Future<void> _loadData() async {
     setState(() => _isLoading = true);
     try {
-      final classes = await StudentAPI.getClasses(widget.token);
-      final results = await StudentAPI.getExamResults(widget.token);
+      // Load song song để tăng tốc độ
+      final results = await Future.wait([
+        StudentAPI.getClasses(widget.token),
+        StudentAPI.getExamResults(widget.token),
+        StudentAPI.getRecentExams(token: widget.token, limit: 5),
+      ]);
+
+      final classes = results[0] as List<dynamic>;
+      final examResults = results[1] as List<dynamic>;
+      final recentExams = results[2] as List<Map<String, dynamic>>;
+
+      // Tính điểm trung bình
+      double total = 0;
+      for (var result in examResults) {
+        total += result['score'];
+      }
+      double average = examResults.isEmpty ? 0 : total / examResults.length;
 
       setState(() {
         _myClasses = classes;
-        _recentExams = results.take(5).toList();
+        _allResults = examResults;
+        _recentExams = recentExams;
+        _averageScore = average;
         _isLoading = false;
       });
     } catch (e) {
       setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi tải dữ liệu: $e')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi tải dữ liệu: $e')),
+        );
+      }
     }
   }
 
@@ -89,6 +112,8 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                   children: [
                     _buildWelcomeCard(),
                     const SizedBox(height: 24),
+                    _buildStatisticsCard(),
+                    const SizedBox(height: 24),
                     _buildQuickActions(),
                     const SizedBox(height: 24),
                     _buildRecentExams(),
@@ -133,6 +158,93 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
     );
   }
 
+  Widget _buildStatisticsCard() {
+    return Card(
+      color: Colors.purple.shade50,
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            Text(
+              'Thống kê tổng quan',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _buildStatItem(
+                  icon: Icons.quiz,
+                  label: 'Tổng bài thi',
+                  value: '${_allResults.length}',
+                  color: Colors.blue,
+                ),
+                _buildStatItem(
+                  icon: Icons.star,
+                  label: 'Điểm TB',
+                  value: _averageScore.toStringAsFixed(1),
+                  color: Colors.orange,
+                ),
+                _buildStatItem(
+                  icon: Icons.trending_up,
+                  label: 'Cao nhất',
+                  value: _getHighestScore(),
+                  color: Colors.green,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStatItem({
+    required IconData icon,
+    required String label,
+    required String value,
+    required Color color,
+  }) {
+    return Column(
+      children: [
+        CircleAvatar(
+          backgroundColor: color.withOpacity(0.2),
+          radius: 30,
+          child: Icon(icon, color: color, size: 30),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            color: Colors.grey.shade700,
+            fontSize: 12,
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _getHighestScore() {
+    if (_allResults.isEmpty) return '0';
+    int highest = 0;
+    for (var result in _allResults) {
+      if (result['score'] > highest) {
+        highest = result['score'];
+      }
+    }
+    return '$highest';
+  }
+
   Widget _buildQuickActions() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -158,10 +270,17 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
             Expanded(
               child: _buildActionCard(
                 icon: Icons.quiz_outlined,
-                title: 'Bài thi',
+                title: 'Lịch sử thi',
                 color: Colors.orange,
                 onTap: () {
-                  // TODO: Navigate to exams list
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => ExamResultsScreen(
+                        token: widget.token,
+                      ),
+                    ),
+                  );
                 },
               ),
             ),
@@ -206,14 +325,23 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Bài thi gần đây',
+              'Bài thi mới nhất',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.bold,
                   ),
             ),
             TextButton(
               onPressed: () {
-                // TODO: Navigate to all results
+                // Navigate to classes screen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => StudentClassesScreen(
+                      token: widget.token,
+                      studentId: widget.studentId,
+                    ),
+                  ),
+                ).then((_) => _loadData());
               },
               child: const Text('Xem tất cả'),
             ),
@@ -245,31 +373,118 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                 itemCount: _recentExams.length,
                 itemBuilder: (context, index) {
                   final exam = _recentExams[index];
-                  return Card(
-                    child: ListTile(
-                      leading: CircleAvatar(
-                        backgroundColor: _getScoreColor(exam['score']),
-                        child: Text(
-                          '${exam['score']}',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      title: Text(exam['ExamTest']['title']),
-                      subtitle: Text(
-                        _formatDate(exam['submitAt']),
-                      ),
-                      trailing: const Icon(Icons.chevron_right),
-                      onTap: () {
-                        // TODO: Navigate to exam result detail
-                      },
-                    ),
-                  );
+                  return _buildExamCard(exam);
                 },
               ),
       ],
+    );
+  }
+
+  Widget _buildExamCard(Map<String, dynamic> exam) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ExamDetailScreen(
+                token: widget.token,
+                examId: exam['id'].toString(),
+                examTitle: exam['title'],
+                duration: exam['duration'],
+              ),
+            ),
+          ).then((submitted) {
+            if (submitted == true) {
+              _loadData();
+            }
+          });
+        },
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                width: 50,
+                height: 50,
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.quiz,
+                  color: Colors.blue,
+                  size: 28,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      exam['title'],
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.class_,
+                            size: 14, color: Colors.grey.shade600),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            exam['className'] ?? 'N/A',
+                            style: TextStyle(
+                              color: Colors.grey.shade600,
+                              fontSize: 13,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        Icon(Icons.timer,
+                            size: 14, color: Colors.grey.shade600),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${exam['duration']} phút',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Icon(Icons.help_outline,
+                            size: 14, color: Colors.grey.shade600),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${exam['quantityQuestion']} câu',
+                          style: TextStyle(
+                            color: Colors.grey.shade600,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: Colors.grey.shade400),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -277,11 +492,31 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Lớp học của tôi',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.bold,
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              'Lớp học của tôi',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+            if (_myClasses.length > 4)
+              TextButton(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => StudentClassesScreen(
+                        token: widget.token,
+                        studentId: widget.studentId,
+                      ),
+                    ),
+                  ).then((_) => _loadData());
+                },
+                child: const Text('Xem tất cả'),
               ),
+          ],
         ),
         const SizedBox(height: 12),
         _myClasses.isEmpty
@@ -324,7 +559,16 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
                   return Card(
                     child: InkWell(
                       onTap: () {
-                        // TODO: Navigate to class detail
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => ClassDetailScreen(
+                              token: widget.token,
+                              classId: classData['id'].toString(),
+                              className: classData['className'],
+                            ),
+                          ),
+                        ).then((_) => _loadData());
                       },
                       child: Padding(
                         padding: const EdgeInsets.all(16),
@@ -359,12 +603,6 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
               ),
       ],
     );
-  }
-
-  Color _getScoreColor(int score) {
-    if (score >= 80) return Colors.green;
-    if (score >= 50) return Colors.orange;
-    return Colors.red;
   }
 
   String _formatDate(String dateStr) {
