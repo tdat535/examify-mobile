@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:jwt_decoder/jwt_decoder.dart';
 import '../../api/student.dart';
@@ -64,6 +65,19 @@ class _ExamDetailScreenState extends State<ExamDetailScreen>
         token: widget.token,
         examId: widget.examId,
       );
+
+      // XÁO TRỘN ĐÁP ÁN CHO MỖI CÂU HỎI
+      if (data['Questions'] != null) {
+        final questions = data['Questions'] as List;
+        for (var question in questions) {
+          if (question['Answers'] != null) {
+            final answers = question['Answers'] as List;
+            // Xáo trộn danh sách đáp án
+            answers.shuffle(Random());
+          }
+        }
+      }
+
       setState(() {
         _examData = data;
         _isLoading = false;
@@ -147,7 +161,8 @@ class _ExamDetailScreenState extends State<ExamDetailScreen>
       String realName = decoded['realName'] ?? 'Học sinh';
       await FirebaseFirestore.instance.collection('notifications').add({
         'title': 'Học sinh đã nộp bài',
-        'content': '$realName vừa nộp bài ${widget.examTitle} trong ${_examData?['Class']?['className'] ?? ''}.',
+        'content':
+            '$realName vừa nộp bài ${widget.examTitle} trong ${_examData?['Class']?['className'] ?? ''}.',
         'timestamp': FieldValue.serverTimestamp(),
       });
 
