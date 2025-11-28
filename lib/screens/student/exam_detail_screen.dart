@@ -1,6 +1,9 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:jwt_decoder/jwt_decoder.dart';
 import '../../api/student.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class ExamDetailScreen extends StatefulWidget {
   final String token;
@@ -20,7 +23,8 @@ class ExamDetailScreen extends StatefulWidget {
   State<ExamDetailScreen> createState() => _ExamDetailScreenState();
 }
 
-class _ExamDetailScreenState extends State<ExamDetailScreen> {
+class _ExamDetailScreenState extends State<ExamDetailScreen>
+    with WidgetsBindingObserver {
   bool _isLoading = true;
   bool _isSubmitting = false;
   Map<String, dynamic>? _examData;
@@ -32,13 +36,25 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadExamDetail();
   }
 
   @override
   void dispose() {
     _timer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
+  }
+
+  /// Theo dõi trạng thái app
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Khi app đi background → tự động nộp
+    if (state == AppLifecycleState.paused && !_isSubmitting) {
+      _submitExam(auto: true);
+    }
   }
 
   Future<void> _loadExamDetail() async {
@@ -78,36 +94,39 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(content: Text('Hết giờ! Đang tự động nộp bài...')),
     );
-    _submitExam();
+    _submitExam(auto: true);
   }
 
-  Future<void> _submitExam() async {
+  /// [auto] = true nếu tự động nộp (hết giờ / rời app)
+  Future<void> _submitExam({bool auto = false}) async {
     if (_isSubmitting) return;
 
-    // Kiểm tra xem đã trả lời hết câu hỏi chưa
-    final totalQuestions = (_examData?['Questions'] as List?)?.length ?? 0;
-    if (_selectedAnswers.length < totalQuestions) {
-      final shouldSubmit = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('Chưa hoàn thành'),
-          content: Text(
-            'Bạn mới trả lời ${_selectedAnswers.length}/$totalQuestions câu. '
-            'Bạn có chắc muốn nộp bài?',
+    // Nếu submit tự động, không hiện confirm dialog
+    if (!auto) {
+      final totalQuestions = (_examData?['Questions'] as List?)?.length ?? 0;
+      if (_selectedAnswers.length < totalQuestions) {
+        final shouldSubmit = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Chưa hoàn thành'),
+            content: Text(
+              'Bạn mới trả lời ${_selectedAnswers.length}/$totalQuestions câu. '
+              'Bạn có chắc muốn nộp bài?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Tiếp tục làm'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Nộp bài'),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('Tiếp tục làm'),
-            ),
-            ElevatedButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('Nộp bài'),
-            ),
-          ],
-        ),
-      );
-      if (shouldSubmit != true) return;
+        );
+        if (shouldSubmit != true) return;
+      }
     }
 
     setState(() => _isSubmitting = true);
@@ -122,19 +141,37 @@ class _ExamDetailScreenState extends State<ExamDetailScreen> {
         answers: answers,
       );
 
+      Map<String, dynamic> decoded = JwtDecoder.decode(widget.token);
+      print(decoded); // xem các key có gì
+
+      String realName = decoded['realName'] ?? 'Học sinh';
+      await FirebaseFirestore.instance.collection('notifications').add({
+        'title': 'Học sinh đã nộp bài',
+        'content': '$realName vừa nộp bài ${widget.examTitle} trong ${_examData?['Class']?['className'] ?? ''}.',
+        'timestamp': FieldValue.serverTimestamp(),
+      });
+
       _timer?.cancel();
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Nộp bài thành công!')),
+          SnackBar(
+            content: Text(
+              auto
+                  ? 'Bài thi đã được tự động nộp do rời app hoặc hết giờ.'
+                  : 'Nộp bài thành công!',
+            ),
+          ),
         );
         Navigator.pop(context, true); // Return true để refresh danh sách
       }
     } catch (e) {
       setState(() => _isSubmitting = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi nộp bài: $e')),
-      );
+      if (!auto) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Lỗi nộp bài: $e')),
+        );
+      }
     }
   }
 

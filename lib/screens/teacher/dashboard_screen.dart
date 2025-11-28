@@ -1,11 +1,12 @@
+// lib/screens/dashboard/dashboard_screen.dart
 import 'package:flutter/material.dart';
 import 'package:advanced_salomon_bottom_bar/advanced_salomon_bottom_bar.dart';
 import '../../utils/token_storage.dart';
 import '../../api/dashboard.dart';
 import '../authentication/login_screen.dart';
-import 'class_list_screen.dart';
-import 'profile_screen.dart';
-import 'notification_screen.dart';
+import '../teacher/class_list_screen.dart';
+import '../teacher/notification_screen.dart';
+import '../teacher/profile_screen.dart';
 import '../../widgets/stats_card.dart';
 import '../../widgets/class_card.dart';
 
@@ -20,6 +21,7 @@ class DashboardScreen extends StatefulWidget {
 class _DashboardScreenState extends State<DashboardScreen> {
   int _selectedIndex = 0;
 
+  String? token; // lưu token
   Map<String, dynamic>? dashboardData;
   List<dynamic> recentClasses = [];
   bool isLoading = true;
@@ -28,25 +30,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDashboard();
+    _initTokenAndDashboard();
+  }
+
+  Future<void> _initTokenAndDashboard() async {
+    token = await TokenStorage.getToken();
+    if (token == null && context.mounted) {
+      Navigator.pushReplacementNamed(context, LoginScreen.routeName);
+      return;
+    }
+    await _loadDashboard();
+    setState(() {}); // refresh UI khi token đã load
   }
 
   Future<void> _loadDashboard() async {
+    if (token == null) return;
+
     try {
       if (!isRefreshing) {
         setState(() => isLoading = true);
       }
 
-      final token = await TokenStorage.getToken();
-      if (token == null) {
-        if (context.mounted) {
-          Navigator.pushReplacementNamed(context, LoginScreen.routeName);
-        }
-        return;
-      }
-
-      final data = await DashboardApi.fetchDashboardData(token);
-      final classes = await DashboardApi.fetchDashboardClasses(token);
+      final data = await DashboardApi.fetchDashboardData(token!);
+      final classes = await DashboardApi.fetchDashboardClasses(token!);
 
       setState(() {
         dashboardData = data;
@@ -69,14 +75,12 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   void _onTabSelected(int index) {
     setState(() => _selectedIndex = index);
-    if (index == 0) {
-      _loadDashboard();
-    }
+    if (index == 0) _loadDashboard();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (isLoading) {
+    if (isLoading || token == null) {
       return const Scaffold(
         body: Center(child: CircularProgressIndicator()),
       );
@@ -85,8 +89,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final pages = [
       _dashboardTab(),
       const ClassListScreen(),
-      const NotificationScreen(),
-      const ProfileScreen(),
+      NotificationScreen(token: token!),
+      TeacherProfileScreen(token: token!), // ✅ token đã có
     ];
 
     return Scaffold(

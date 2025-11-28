@@ -8,6 +8,7 @@ import 'add_questions_screen.dart';
 class ExamQuestionScreen extends StatefulWidget {
   static const routeName = '/exam-questions';
   final Map<String, dynamic> exam;
+
   const ExamQuestionScreen({super.key, required this.exam});
 
   @override
@@ -27,8 +28,11 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
   Future<void> _loadExamDetail() async {
     try {
       final token = await TokenStorage.getToken();
+      if (token == null) throw Exception('Token không hợp lệ.');
+
       final examId = widget.exam['id'].toString();
-      final res = await ExamApi.getExamDetailForTeacher(token!, examId);
+      final res = await ExamApi.getExamDetailForTeacher(token, examId);
+
       setState(() {
         examDetail = res;
         isLoading = false;
@@ -36,9 +40,11 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
     } catch (e) {
       setState(() => isLoading = false);
       debugPrint('❌ Error loading exam: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không thể tải đề thi: $e')),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể tải đề thi: $e')),
+        );
+      }
     }
   }
 
@@ -62,9 +68,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                   ),
                 ),
               );
-              if (result == true) {
-                _loadExamDetail();
-              }
+              if (result == true) _loadExamDetail();
             },
           ),
           IconButton(
@@ -77,12 +81,26 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : examDetail == null
-              ? const Center(child: Text('Không có dữ liệu đề thi.'))
+              ? const Center(
+                  child: Text(
+                    'Không có dữ liệu đề thi.',
+                    style: TextStyle(fontSize: 16, color: Colors.black54),
+                  ),
+                )
               : _buildQuestionList(examDetail!['Questions'] ?? []),
     );
   }
 
   Widget _buildQuestionList(List<dynamic> questions) {
+    if (questions.isEmpty) {
+      return const Center(
+        child: Text(
+          'Không có câu hỏi nào trong đề thi.',
+          style: TextStyle(fontSize: 16, color: Colors.black54),
+        ),
+      );
+    }
+
     return Padding(
       padding: const EdgeInsets.all(16),
       child: ListView.separated(
@@ -130,7 +148,7 @@ class _ExamQuestionScreenState extends State<ExamQuestionScreen> {
                             : null,
                       ),
                     );
-                  }),
+                  }).toList(),
                 ],
               ),
             ),

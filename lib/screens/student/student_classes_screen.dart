@@ -1,33 +1,53 @@
 import 'package:flutter/material.dart';
 import '../../api/student.dart';
+import '../../utils/route_observer.dart';
 import 'join_class_dialog.dart';
 import 'exam_detail_screen.dart';
 
 class StudentClassesScreen extends StatefulWidget {
+  static const routeName = '/student-classes'; // thêm dòng này
   final String token;
-  final int studentId;
+  final int? studentId; // optional
 
   const StudentClassesScreen({
     Key? key,
     required this.token,
-    required this.studentId,
+    this.studentId,
   }) : super(key: key);
 
   @override
   State<StudentClassesScreen> createState() => _StudentClassesScreenState();
 }
 
-class _StudentClassesScreenState extends State<StudentClassesScreen> {
+class _StudentClassesScreenState extends State<StudentClassesScreen>
+    with RouteAware {
   bool _isLoading = true;
   List<dynamic> _classes = [];
 
   @override
-  void initState() {
-    super.initState();
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    routeObserver.subscribe(this, ModalRoute.of(context)!);
+
+    // Chỉ load khi token != null
+    if (widget.token.isNotEmpty) {
+      _loadClasses();
+    }
+  }
+
+  @override
+  void dispose() {
+    routeObserver.unsubscribe(this);
+    super.dispose();
+  }
+
+  @override
+  void didPopNext() {
     _loadClasses();
   }
 
   Future<void> _loadClasses() async {
+    if (widget.token.isEmpty) return; // bảo vệ nếu token chưa có
     setState(() => _isLoading = true);
     try {
       final classes = await StudentAPI.getClasses(widget.token);
@@ -48,7 +68,7 @@ class _StudentClassesScreenState extends State<StudentClassesScreen> {
       context: context,
       builder: (context) => JoinClassDialog(
         token: widget.token,
-        studentId: widget.studentId,
+        studentId: widget.studentId ?? 0,
         onSuccess: _loadClasses,
       ),
     );
@@ -122,7 +142,6 @@ class _StudentClassesScreenState extends State<StudentClassesScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       child: InkWell(
         onTap: () {
-          // TODO: Navigate to class detail with exams
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -207,7 +226,7 @@ class _StudentClassesScreenState extends State<StudentClassesScreen> {
   }
 }
 
-// Class Detail Screen để xem các bài thi trong lớp
+// ===================== Class Detail Screen =====================
 class ClassDetailScreen extends StatefulWidget {
   final String token;
   final String classId;
@@ -306,8 +325,7 @@ class _ClassDetailScreenState extends State<ClassDetailScreen> {
                             ),
                           ).then((submitted) {
                             if (submitted == true) {
-                              // Refresh danh sách bài thi sau khi nộp bài
-                              _loadExams();
+                              _loadExams(); // reload sau khi nộp bài
                             }
                           });
                         },

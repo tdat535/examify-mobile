@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../api/student.dart';
 import 'join_class_dialog.dart';
 import 'exam_results_screen.dart';
+import 'notifcation.dart';
 import 'student_classes_screen.dart';
 import 'exam_detail_screen.dart';
 
@@ -95,7 +96,13 @@ class _StudentHomeScreenState extends State<StudentHomeScreen> {
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () {
-              // TODO: Navigate to notifications
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) =>
+                      NotificationsScreen(userId: widget.studentId.toString()),
+                ),
+              );
             },
           ),
         ],

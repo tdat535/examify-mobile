@@ -96,11 +96,13 @@ class _ExamResultsScreenState extends State<ExamResultsScreen> {
   Widget _buildResultCard(Map<String, dynamic> result) {
     final score = result['score']?.toDouble() ?? 0.0;
     final submitAt = result['submitAt'] ?? '';
-    final examTitle = result['ExamTest']?['title'] ?? 'Chưa có tên';
+    final examTitle = result['examTest']?['title'] ?? 'Chưa có tên';
+    final className = result['examTest']?['Class']?['className'] 
+                  ?? 'Không có lớp';
 
-    // Xác định màu sắc dựa trên điểm
     Color scoreColor;
     IconData scoreIcon;
+
     if (score >= 8) {
       scoreColor = Colors.green;
       scoreIcon = Icons.emoji_events;
@@ -151,6 +153,17 @@ class _ExamResultsScreenState extends State<ExamResultsScreen> {
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                       ),
+
+                      // 👇 THÊM TÊN LỚP TẠI ĐÂY
+                      Text(
+                        className,
+                        style: TextStyle(
+                          color: Colors.blueGrey.shade600,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+
                       const SizedBox(height: 4),
                       Text(
                         _formatDateTime(submitAt),

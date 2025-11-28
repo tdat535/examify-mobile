@@ -1,4 +1,9 @@
+import 'package:examify_app/screens/student/EditProfileScreen.dart';
 import 'package:flutter/material.dart';
+import '../../api/auth.dart';
+import '../../utils/token_storage.dart';
+import '../authentication/login_screen.dart';
+import './EditProfileScreen.dart';
 
 class StudentProfileScreen extends StatefulWidget {
   final String token;
@@ -25,16 +30,9 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
   Future<void> _loadProfile() async {
     setState(() => _isLoading = true);
     try {
-      // TODO: Gọi API lấy thông tin profile
-      // Tạm thời dùng dữ liệu mẫu
-      await Future.delayed(const Duration(seconds: 1));
+      final profile = await AuthAPI.getProfile(widget.token);
       setState(() {
-        _profile = {
-          'username': 'Nguyễn Văn A',
-          'email': 'nguyenvana@example.com',
-          'studentId': '2021001',
-          'phone': '0123456789',
-        };
+        _profile = profile;
         _isLoading = false;
       });
     } catch (e) {
@@ -80,6 +78,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
   }
 
   Widget _buildProfileHeader() {
+    final displayName = _profile?['realName'] ?? 'Tên người dùng';
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
@@ -98,7 +97,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                 radius: 50,
                 backgroundColor: Colors.white,
                 child: Text(
-                  _getInitials(_profile?['username'] ?? 'U'),
+                  _getInitials(displayName),
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
@@ -126,7 +125,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
           ),
           const SizedBox(height: 16),
           Text(
-            _profile?['username'] ?? 'Tên người dùng',
+            displayName,
             style: const TextStyle(
               fontSize: 24,
               fontWeight: FontWeight.bold,
@@ -141,27 +140,13 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
               color: Colors.white.withOpacity(0.9),
             ),
           ),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              'MSSV: ${_profile?['studentId'] ?? 'N/A'}',
-              style: const TextStyle(
-                color: Colors.white,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
         ],
       ),
     );
   }
 
   Widget _buildProfileInfo() {
+    final displayName = _profile?['realName'] ?? 'Chưa cập nhật';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Card(
@@ -177,17 +162,13 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                     ),
               ),
               const SizedBox(height: 16),
-              _buildInfoRow(Icons.person, 'Họ tên',
-                  _profile?['username'] ?? 'Chưa cập nhật'),
+              _buildInfoRow(Icons.person, 'Họ tên', displayName),
               const Divider(),
               _buildInfoRow(
                   Icons.email, 'Email', _profile?['email'] ?? 'Chưa cập nhật'),
               const Divider(),
               _buildInfoRow(Icons.phone, 'Số điện thoại',
                   _profile?['phone'] ?? 'Chưa cập nhật'),
-              const Divider(),
-              _buildInfoRow(Icons.badge, 'Mã sinh viên',
-                  _profile?['studentId'] ?? 'Chưa cập nhật'),
             ],
           ),
         ),
@@ -226,8 +207,20 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
           ),
           IconButton(
             icon: Icon(Icons.edit_outlined, color: Colors.grey.shade600),
-            onPressed: () {
-              // TODO: Edit profile
+            onPressed: () async {
+              if (_profile == null) return;
+              final updated = await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => EditProfileScreen(
+                    token: widget.token,
+                    realName: _profile?['realName'],
+                    email: _profile?['email'],
+                    phone: _profile?['phone'],
+                  ),
+                ),
+              );
+              if (updated != null) _loadProfile(); // 🔄 reload profile
             },
           ),
         ],
@@ -246,8 +239,20 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                 _buildMenuItem(
                   icon: Icons.edit,
                   title: 'Chỉnh sửa hồ sơ',
-                  onTap: () {
-                    // TODO: Navigate to edit profile
+                  onTap: () async {
+                    if (_profile == null) return;
+                    final updated = await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => EditProfileScreen(
+                          token: widget.token,
+                          realName: _profile?['realName'],
+                          email: _profile?['email'],
+                          phone: _profile?['phone'],
+                        ),
+                      ),
+                    );
+                    if (updated != null) _loadProfile();
                   },
                 ),
                 const Divider(height: 1),
@@ -255,7 +260,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                   icon: Icons.lock_outline,
                   title: 'Đổi mật khẩu',
                   onTap: () {
-                    // TODO: Navigate to change password
+                    // TODO
                   },
                 ),
                 const Divider(height: 1),
@@ -263,7 +268,7 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                   icon: Icons.notifications_outlined,
                   title: 'Thông báo',
                   onTap: () {
-                    // TODO: Navigate to notifications settings
+                    // TODO
                   },
                 ),
               ],
@@ -276,25 +281,45 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
                 _buildMenuItem(
                   icon: Icons.help_outline,
                   title: 'Trợ giúp',
-                  onTap: () {
-                    // TODO: Navigate to help
-                  },
+                  onTap: () {},
                 ),
                 const Divider(height: 1),
                 _buildMenuItem(
                   icon: Icons.info_outline,
                   title: 'Về ứng dụng',
-                  onTap: () {
-                    _showAboutDialog();
-                  },
+                  onTap: () => _showAboutDialog(),
                 ),
                 const Divider(height: 1),
                 _buildMenuItem(
                   icon: Icons.logout,
                   title: 'Đăng xuất',
                   textColor: Colors.red,
-                  onTap: () {
-                    _showLogoutDialog();
+                  onTap: () async {
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Đăng xuất'),
+                        content: const Text(
+                            'Bạn có chắc chắn muốn đăng xuất không?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, false),
+                            child: const Text('Hủy'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.pop(context, true),
+                            child: const Text('Đăng xuất',
+                                style: TextStyle(color: Colors.red)),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (confirm != true) return;
+                    await TokenStorage.clear();
+                    if (context.mounted) {
+                      Navigator.pushReplacementNamed(
+                          context, LoginScreen.routeName);
+                    }
                   },
                 ),
               ],
@@ -306,21 +331,15 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
     );
   }
 
-  Widget _buildMenuItem({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    Color? textColor,
-  }) {
+  Widget _buildMenuItem(
+      {required IconData icon,
+      required String title,
+      required VoidCallback onTap,
+      Color? textColor}) {
     return ListTile(
       leading: Icon(icon, color: textColor ?? Colors.blue.shade700),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: textColor,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
+      title: Text(title,
+          style: TextStyle(color: textColor, fontWeight: FontWeight.w500)),
       trailing: Icon(Icons.chevron_right, color: Colors.grey.shade400),
       onTap: onTap,
     );
@@ -332,45 +351,18 @@ class _StudentProfileScreenState extends State<StudentProfileScreen> {
       applicationName: 'Examify',
       applicationVersion: '1.0.0',
       applicationIcon: const Icon(Icons.school, size: 48, color: Colors.blue),
-      children: [
-        const Text('Ứng dụng thi trắc nghiệm trực tuyến'),
-        const SizedBox(height: 8),
-        const Text('Phát triển bởi Team Examify'),
+      children: const [
+        Text('Ứng dụng thi trắc nghiệm trực tuyến'),
+        SizedBox(height: 8),
+        Text('Phát triển bởi Team Examify'),
       ],
     );
   }
 
-  void _showLogoutDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Đăng xuất'),
-        content: const Text('Bạn có chắc chắn muốn đăng xuất?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Hủy'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              // TODO: Implement logout
-              Navigator.pop(context);
-              // Navigate to login screen
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.red,
-            ),
-            child: const Text('Đăng xuất'),
-          ),
-        ],
-      ),
-    );
-  }
-
   String _getInitials(String name) {
-    List<String> parts = name.split(' ');
+    final parts = name.split(' ');
     if (parts.isEmpty) return 'U';
     if (parts.length == 1) return parts[0][0].toUpperCase();
-    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+    return (parts[0][0] + parts.last[0]).toUpperCase();
   }
 }
