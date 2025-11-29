@@ -1,11 +1,20 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:jwt_decoder/jwt_decoder.dart';
 import '../../api/student.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 
+// ===================== Store thời gian cho các bài thi =====================
+class ExamTimerStore {
+  static final ExamTimerStore _instance = ExamTimerStore._internal();
+  factory ExamTimerStore() => _instance;
+  ExamTimerStore._internal();
+
+  final Map<String, int> remainingSecondsMap = {};
+}
+
+final examTimerStore = ExamTimerStore();
+
+// ===================== Exam Detail Screen =====================
 class ExamDetailScreen extends StatefulWidget {
   final String token;
   final String examId;
@@ -38,6 +47,11 @@ class _ExamDetailScreenState extends State<ExamDetailScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    // Lấy thời gian còn lại nếu đã có, nếu chưa thì dùng duration
+    _remainingSeconds =
+        examTimerStore.remainingSecondsMap[widget.examId] ?? widget.duration * 60;
+
     _loadExamDetail();
   }
 
@@ -48,11 +62,10 @@ class _ExamDetailScreenState extends State<ExamDetailScreen>
     super.dispose();
   }
 
-  /// Theo dõi trạng thái app
+  /// Theo dõi trạng thái app để auto submit khi rời app
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    // Khi app đi background → tự động nộp
     if (state == AppLifecycleState.paused && !_isSubmitting) {
       _submitExam(auto: true);
     }
@@ -66,13 +79,12 @@ class _ExamDetailScreenState extends State<ExamDetailScreen>
         examId: widget.examId,
       );
 
-      // XÁO TRỘN ĐÁP ÁN CHO MỖI CÂU HỎI
+      // Xáo trộn đáp án cho mỗi câu hỏi
       if (data['Questions'] != null) {
         final questions = data['Questions'] as List;
         for (var question in questions) {
           if (question['Answers'] != null) {
             final answers = question['Answers'] as List;
-            // Xáo trộn danh sách đáp án
             answers.shuffle(Random());
           }
         }
@@ -81,7 +93,6 @@ class _ExamDetailScreenState extends State<ExamDetailScreen>
       setState(() {
         _examData = data;
         _isLoading = false;
-        _remainingSeconds = widget.duration * 60;
         _startTimer();
       });
     } catch (e) {
@@ -96,7 +107,10 @@ class _ExamDetailScreenState extends State<ExamDetailScreen>
   void _startTimer() {
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_remainingSeconds > 0) {
-        setState(() => _remainingSeconds--);
+        setState(() {
+          _remainingSeconds--;
+          examTimerStore.remainingSecondsMap[widget.examId] = _remainingSeconds;
+        });
       } else {
         _timer?.cancel();
         _autoSubmit();
@@ -111,11 +125,9 @@ class _ExamDetailScreenState extends State<ExamDetailScreen>
     _submitExam(auto: true);
   }
 
-  /// [auto] = true nếu tự động nộp (hết giờ / rời app)
   Future<void> _submitExam({bool auto = false}) async {
     if (_isSubmitting) return;
 
-    // Nếu submit tự động, không hiện confirm dialog
     if (!auto) {
       final totalQuestions = (_examData?['Questions'] as List?)?.length ?? 0;
       if (_selectedAnswers.length < totalQuestions) {
@@ -155,18 +167,8 @@ class _ExamDetailScreenState extends State<ExamDetailScreen>
         answers: answers,
       );
 
-      Map<String, dynamic> decoded = JwtDecoder.decode(widget.token);
-      print(decoded); // xem các key có gì
-
-      String realName = decoded['realName'] ?? 'Học sinh';
-      await FirebaseFirestore.instance.collection('notifications').add({
-        'title': 'Học sinh đã nộp bài',
-        'content':
-            '$realName vừa nộp bài ${widget.examTitle} trong ${_examData?['Class']?['className'] ?? ''}.',
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-
       _timer?.cancel();
+      examTimerStore.remainingSecondsMap.remove(widget.examId);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -178,7 +180,7 @@ class _ExamDetailScreenState extends State<ExamDetailScreen>
             ),
           ),
         );
-        Navigator.pop(context, true); // Return true để refresh danh sách
+        Navigator.pop(context, true);
       }
     } catch (e) {
       setState(() => _isSubmitting = false);

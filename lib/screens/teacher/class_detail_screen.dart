@@ -132,8 +132,14 @@ class _ClassDetailScreenState extends State<ClassDetailScreen>
         builder: (_) => CreateExamScreen(classId: widget.classData['id']),
       ),
     );
+
     if (result != null) {
-      setState(() => exams.add(result));
+      setState(() => loadingExams = true);
+      final token = await TokenStorage.getToken();
+      final classId = widget.classData['id'].toString();
+      if (token != null) {
+        await _loadExams(token, classId);
+      }
     }
   }
 
@@ -193,8 +199,16 @@ class _ClassDetailScreenState extends State<ClassDetailScreen>
       floatingActionButton: _tabController.index == 1
           ? FloatingActionButton.extended(
               onPressed: _createExam,
-              label: const Text('Tạo bài thi',  style: TextStyle(color: Color.fromARGB(255, 255, 255, 255), fontWeight:FontWeight.w600),),
-              icon: const Icon(Icons.add, color: Color.fromARGB(255, 255, 255, 255),),
+              label: const Text(
+                'Tạo bài thi',
+                style: TextStyle(
+                    color: Color.fromARGB(255, 255, 255, 255),
+                    fontWeight: FontWeight.w600),
+              ),
+              icon: const Icon(
+                Icons.add,
+                color: Color.fromARGB(255, 255, 255, 255),
+              ),
               backgroundColor: const Color(0xFF7B61FF),
             )
           : null,

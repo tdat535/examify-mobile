@@ -1,5 +1,9 @@
 // lib/screens/login_screen.dart
+import 'dart:convert';
+
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import '../../api/auth.dart';
 import '../../utils/handleFacebookLogin.dart';
 import '../../utils/handleGoogleLogin.dart';
@@ -37,19 +41,36 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (res['status'] == true && res['data']?['accessToken'] != null) {
         final accessToken = res['data']['accessToken'];
-
         await TokenStorage.saveToken(accessToken);
 
+        // Decode token lấy thông tin user
         final decoded = JwtDecoder.decode(accessToken);
         final role = decoded['role'];
-        final userId =
-            decoded['id'] ?? decoded['userId'] ?? 0; // Lấy userId từ token
+        final userId = decoded['id'] ?? decoded['userId'] ?? 0;
 
+        // ==== BƯỚC MỚI: LẤY FCM TOKEN VÀ GỬI LÊN SERVER ====
+        try {
+          final fcmToken = await FirebaseMessaging.instance.getToken();
+          if (fcmToken != null) {
+            await http.post(
+              Uri.parse('https://examify-api-iota.vercel.app/api/auth/update-fcm-token'),
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $accessToken'
+              },
+              body: jsonEncode({'userId': userId, 'fcmToken': fcmToken}),
+            );
+          }
+        } catch (e) {
+          print('Lỗi gửi FCM token: $e');
+        }
+
+        // Chuyển màn hình dựa trên role
         if (role == 2) {
           // Teacher
           Navigator.pushReplacementNamed(context, DashboardScreen.routeName);
         } else if (role == 3) {
-          // Student - Truyền token và studentId
+          // Student
           Navigator.pushReplacementNamed(
             context,
             StudentScreen.routeName,

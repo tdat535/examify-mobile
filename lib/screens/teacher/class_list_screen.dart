@@ -160,7 +160,7 @@ class _ClassListScreenState extends State<ClassListScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'Thông báo',
+          'Lớp học',
           style: TextStyle(fontWeight: FontWeight.w600),
         ),
         elevation: 0,
